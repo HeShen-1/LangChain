@@ -116,7 +116,7 @@ if result:
             with st.expander("查看图片URL（调试用）"):
                 st.code(image_url)
 
-    # 新增：显示原始AI��应
+    # 新增：显示原始AI应
     with col2:
         with st.expander("查看AI原始响应（调试用）"):
             st.code(raw_response)

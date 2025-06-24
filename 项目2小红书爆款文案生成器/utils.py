@@ -9,7 +9,7 @@ from typing import  List, Optional
 import requests  # 新增
 from urllib.parse import quote
 
-# 配置日志，���于调试
+# 配置日志，���试
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -81,128 +81,174 @@ def generate_xiaohongshu(
 def get_baidu_image_url(query: str) -> Optional[str]:
     """
     爬取百度图片搜索结果，返回最相关的图片URL。
+    直接使用用户输入的主题作为搜索关键词，确保相关性。
     """
+    if not query or not isinstance(query, str):
+        logger.error("无效的搜索关键词")
+        return None
+
     try:
-        # 关键词优化
+        # 关键词优化：保持原始主题，只去除干扰词
         def clean_query(q: str) -> str:
-            # 移除常见的干扰词
             noise_words = ['怎么样', '如何', '为什么', '是什么', '可以', '应该', '教程']
-            for word in noise_words:
-                q = q.replace(word, '')
-            return q.strip()
+            # 只移除独立的干扰词，保持短语的完整性
+            words = q.split()
+            cleaned_words = [w for w in words if w not in noise_words]
+            return ' '.join(cleaned_words).strip()
 
-        # 清理搜索词
-        query = clean_query(query)
+        # 清理并验证搜索词
+        cleaned_query = clean_query(query)
+        if not cleaned_query:
+            logger.error("清理后的搜索关键词为空")
+            return None
 
-        # 分析主题类型
-        product_keywords = ['产品', '物品', '商品', '东西', '神器']
-        scene_keywords = ['场景', '地方', '环境', '空间']
-        person_keywords = ['人物', '博主', '达人', '美女', '帅哥']
+        # 使用原始主题作为基础搜索词
+        search_query = cleaned_query
 
-        # 根据主题类型添加特定的搜索限定词
-        if any(kw in query for kw in product_keywords):
-            search_query = f"{query} 实物图 白底"
-        elif any(kw in query for kw in scene_keywords):
-            search_query = f"{query} 实景图 高清"
-        elif any(kw in query for kw in person_keywords):
-            search_query = f"{query} 生活照 清晰"
+        # 根据主题内容添加搜索限定词
+        if any(kw in cleaned_query for kw in ['产品', '物品', '商品', '神器', '好物']):
+            search_query = f"{cleaned_query} 实拍图"
+        elif any(kw in cleaned_query for kw in ['场景', '地点', '环境', '空间']):
+            search_query = f"{cleaned_query} 场景图"
+        elif any(kw in cleaned_query for kw in ['人物', '博主', '达人']):
+            search_query = f"{cleaned_query} 人物图"
         else:
-            search_query = f"{query} 高清实拍 清晰"
+            # 保持原始搜索词，只添加高清限定
+            search_query = f"{cleaned_query} 高清"
+
+        logger.info(f"原始主题: {query}")
+        logger.info(f"清理后的搜索词: {cleaned_query}")
+        logger.info(f"最终搜索词: {search_query}")
 
         encoded_query = quote(search_query)
-        search_url = f"https://image.baidu.com/search/acjson"
+        search_url = "https://image.baidu.com/search/acjson"
+
         params = {
             "tn": "resultjson_com",
-            "logid": "7882159396532078822",  # 添加logid
+            "logid": "7882159396532078822",
             "ipn": "rj",
             "ct": "201326592",
-            "is": "",
             "fp": "result",
-            "fr": "",
             "word": encoded_query,
             "queryWord": encoded_query,
-            "height": "800",    # 提高最小高度要求
-            "width": "800",     # 提高最小宽度要求
-            "ic": "0",          # 只搜索彩色图片
-            "z": "0",           # 普通图片
-            "s": "0",           # 全部图片
-            "pn": "0",          # 第一页
-            "rn": "30",         # 增加返回数量以提高匹配概率
-            "gsm": "1e",
+            "height": "800",
+            "width": "800",
+            "ic": "0",
+            "z": "0",
+            "s": "0",
+            "pn": "0",
+            "rn": "30"
         }
 
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             "Accept": "text/plain, */*; q=0.01",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Referer": "https://image.baidu.com/search/index?tn=baiduimage",
             "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"macOS"',
             "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-            "X-Requested-With": "XMLHttpRequest",
+            "X-Requested-With": "XMLHttpRequest"
         }
 
-        resp = requests.get(
-            search_url,
-            params=params,
-            headers=headers,
-            timeout=10
-        )
+        logger.info(f"正在搜索图片: {search_query}")
+        resp = requests.get(search_url, params=params, headers=headers, timeout=10)
 
-        logger.info(f"请求URL: {resp.url}")
-        logger.info(f"状态码: {resp.status_code}")
+        if resp.status_code != 200:
+            logger.error(f"搜索请求失败: HTTP {resp.status_code}")
+            return None
 
-        if resp.status_code == 200:
+        try:
+            data = resp.json()
+        except ValueError as e:
+            logger.error(f"JSON解析失败: {e}")
+            return None
+
+        if not isinstance(data, dict) or "data" not in data:
+            logger.error("返回数据格式错误")
+            return None
+
+        # 更新评分函数以提高主题相关性
+        def score_image(item: dict) -> float:
             try:
-                data = resp.json()
-                if "data" in data and isinstance(data["data"], list):
-                    valid_items = []
-                    # 图片质量评分函数
-                    def score_image(item: dict) -> float:
-                        score = 0
-                        # 分辨率评分
-                        width = int(item.get("width", 0))
-                        height = int(item.get("height", 0))
-                        score += min(1.0, (width * height) / (1920 * 1080))
+                score = 0.0
 
-                        # 文件类型评分
-                        if item.get("type") in ["jpg", "png"]:
-                            score += 0.5
+                # 主题相关性评分（最高3分）
+                title = item.get("fromPageTitle", "").lower()
+                desc = item.get("fromPageTitleEnc", "").lower()
 
-                        # 图片来源评分
-                        if "小红书" in item.get("fromPageTitle", ""):
-                            score += 2.0
+                # 检查原始主题关键词的出现
+                main_keywords = cleaned_query.lower().split()
+                for keyword in main_keywords:
+                    if keyword in title or keyword in desc:
+                        score += 1.5
 
-                        return score
+                # 分辨率评分（最高2分）
+                width = int(item.get("width", 0))
+                height = int(item.get("height", 0))
+                score += min(2.0, (width * height) / (1920 * 1080))
 
-                    # 过滤并排序图片
-                    valid_items = [
-                        item for item in data["data"][:30]
-                        if isinstance(item, dict) and
-                        int(item.get("width", 0)) >= 800 and
-                        int(item.get("height", 0)) >= 800
-                    ]
+                # 图片来源评分（最高1分）
+                if "小红书" in title:
+                    score += 1.0
+                elif any(kw in title for kw in ["官方", "原创"]):
+                    score += 0.5
 
-                    # 按质量评分排序
-                    valid_items.sort(key=score_image, reverse=True)
+                return score
+            except Exception as e:
+                logger.warning(f"图片评分失败: {e}")
+                return 0.0
 
-                    # 尝试获取最佳图片URL
-                    for item in valid_items[:5]:  # 只尝试质量最高的5张
-                        for url_field in ["objURL", "middleURL", "thumbURL"]:
-                            if item.get(url_field):
-                                url = item[url_field]
-                                try:
-                                    test_resp = requests.head(url, timeout=3)
-                                    if test_resp.status_code == 200:
-                                        logger.info(f"成功获取最佳匹配图片URL: {url}")
-                                        return url
-                                except:
-                                    continue
+        # 过滤和排序图片时添加更严格的相关性检查
+        valid_items = []
+        for item in data["data"][:30]:
+            try:
+                if not isinstance(item, dict):
+                    continue
 
-        logger.warning(f"未找到合适的图片URL, 响应内容: {resp.text[:200]}...")
+                # 基本尺寸检查
+                width = int(item.get("width", 0))
+                height = int(item.get("height", 0))
+
+                # 确保图片符合尺寸要求且至少包含一个主题关键词
+                title = item.get("fromPageTitle", "").lower()
+                desc = item.get("fromPageTitleEnc", "").lower()
+                has_keyword = any(kw.lower() in title or kw.lower() in desc
+                                for kw in cleaned_query.split())
+
+                if width >= 800 and height >= 800 and has_keyword:
+                    valid_items.append(item)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"图片数据处理错误: {e}")
+                continue
+
+        if not valid_items:
+            logger.warning("未找到符合尺寸要求的图片")
+            return None
+
+        # 按质量评分排序
+        valid_items.sort(key=score_image, reverse=True)
+
+        # 尝试获取可用的图片URL
+        for item in valid_items[:5]:
+            for url_field in ["objURL", "middleURL", "thumbURL"]:
+                if url := item.get(url_field):
+                    try:
+                        test_resp = requests.head(url, timeout=3, allow_redirects=True)
+                        if test_resp.status_code == 200:
+                            logger.info(f"成功获取图片: {url[:100]}...")
+                            return url
+                    except requests.RequestException as e:
+                        logger.warning(f"图片URL测试失败: {url[:100]}... ({e})")
+                        continue
+
+        logger.warning("所有候选图片均无法访问")
+        return None
+
+    except requests.Timeout:
+        logger.error("请求超时")
+    except requests.ConnectionError:
+        logger.error("网络连接错误")
     except Exception as e:
-        logger.error(f"百度图片获取失败: {str(e)}")
+        logger.error(f"图片搜索过程出错: {e}", exc_info=True)
+
     return None
