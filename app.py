@@ -175,9 +175,6 @@ def show_video_script():
 
 # 小红书文案
 def show_xiaohongshu():
-    import streamlit as st
-    from utils import generate_xiaohongshu, get_baidu_image_url
-
     # 定义支持的风格列表，需与utils中的风格名称一致
     STYLES = ["幽默调侃", "专业干货", "亲切治愈", "活泼种草"]
     st.set_page_config(page_title="小红书爆款文案生成器", layout="wide")
