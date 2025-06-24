@@ -53,5 +53,3 @@ def generate_script(subject, video_length, creativity, api_key):
     return title, script
 
 
-print(generate_script('GPT', 1, 0.7))
-

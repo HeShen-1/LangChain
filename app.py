@@ -1,18 +1,14 @@
 import streamlit as st
 import os
 import tempfile
-from langchain.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from langchain.chains import ConversationChain
+# 1. 导入各子项目的功能函数
+from 项目1视频脚本一键生成器.utils import generate_script as video_generate_script
+from 项目2小红书爆款文案生成器.utils import generte_xiaohongshu
+from 项目3克隆ChatGPT.utils import get_chat_response
+from 项目4智能PDF问答工具.utils import qa_agent
 from langchain.memory import ConversationBufferMemory
-from langchain.output_parsers import PydanticOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 from typing import List
-from langchain.chains import ConversationalRetrievalChain
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_openai.embeddings import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # 设置页面配置
 st.set_page_config(
@@ -22,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 小红书模型定义
+# 小红书模型定义（兼容主页面显示）
 class XiaoHongShu(BaseModel):
     titles: List[str] = Field(description='小红书的5个标题', min_items=5, max_items=10)
     content: str = Field(description='小红书的正文内容')
@@ -66,140 +62,7 @@ with st.sidebar:
     st.markdown("### 📞 联系我们")
     st.markdown("如有问题，请联系开发团队")
 
-# 工具函数
-def generate_script(subject, video_length, creativity, api_key):
-    """生成视频脚本"""
-    title_template = ChatPromptTemplate.from_messages([
-        ('human', '请为{subject}这个主题的视频想一个吸引人的标题')
-    ])
-
-    script_template = ChatPromptTemplate.from_messages([
-        ('human', """
-            你是一位短视频频道的博主。根据以下标题和相关信息，为短视频频道写一个视频脚本。
-            视频标题：{title}，视频时长：{duration}分钟，生成的脚本的长度尽量遵循视频时长的要求。
-            要求开头抓住眼球，中间提供干货内容，结尾有惊喜，脚本格式也请按照【开头、中间，结尾】分隔。
-            整体内容的表达方式要尽量轻松有趣，吸引年轻人。
-        """)
-    ])
-
-    model = ChatOpenAI(
-        base_url='https://api.openai-hk.com/v1/',
-        openai_api_key=api_key,
-        temperature=creativity
-    )
-    
-    title_chain = title_template | model
-    script_chain = script_template | model
-
-    title = title_chain.invoke({'subject': subject}).content
-    script = script_chain.invoke({'title': title, 'duration': video_length}).content
-
-    return title, script
-
-def generate_xiaohongshu(theme, api_key):
-    """生成小红书文案"""
-    system_template_text = '''
-    你是小红书爆款写作专家，请你遵循以下步骤进行创作：
-    首先产出5个标题（包含适当的emoji表情），然后产出1段正文（每一个段落包含适当的emoji表情，文末有适当的tag标签）。
-    标题字数在20个字以内，正文字数在800字以内，并且按以下技巧进行创作。
-    
-    一、标题创作技巧： 
-    1. 采用二极管标题法进行创作 
-    2. 使用具有吸引力的标题 
-    3. 使用爆款关键词：好用到哭、大数据、教科书般、小白必看、宝藏、绝绝子、神器、都给我冲、划重点、笑不活了、YYDS、秘方、我不允许、压箱底、建议收藏、停止摆烂、上天在提醒你、挑战全网、手把手、揭秘、普通女生、沉浸式、有手就能做、吹爆、好用哭了、搞钱必看、狠狠搞钱、打工人、吐血整理、家人们、隐藏、高级感、治愈、破防了、万万没想到、爆款、永远可以相信、被夸爆、手残党必备、正确姿势
-    4. 控制字数在20字以内，以口语化的表达方式
-    
-    二、正文创作技巧
-    1. 写作风格：从严肃、幽默、愉快、激动、沉思、温馨、崇敬、轻松、热情、安慰、喜悦、欢乐、平和、肯定、质疑、鼓励、建议、真诚、亲切中选择
-    2. 写作开篇方法：引用名人名言、提出疑问、言简意赅、使用数据、列举事例、描述场景、用对比
-    
-    {parser_instructions}
-    '''
-
-    prompt = ChatPromptTemplate.from_messages([
-        ('system', system_template_text),
-        ('user', '{theme}')
-    ])
-
-    model = ChatOpenAI(
-        base_url="https://api.openai-hk.com/v1",
-        openai_api_key=api_key,
-        model='gpt-3.5-turbo'
-    )
-    
-    output_parser = PydanticOutputParser(pydantic_object=XiaoHongShu)
-    chain = prompt | model | output_parser
-    
-    result = chain.invoke({
-        'parser_instructions': output_parser.get_format_instructions(), 
-        'theme': theme
-    })
-    
-    return result
-
-def get_chat_response(prompt, memory, api_key):
-    """获取聊天回复"""
-    model = ChatOpenAI(
-        base_url='https://api.openai-hk.com/v1/',
-        openai_api_key=api_key,
-        model='gpt-3.5-turbo'
-    )
-    chain = ConversationChain(llm=model, memory=memory)
-    response = chain.invoke({'input': prompt})
-    return response['response']
-
-def qa_agent(api_key, memory, uploaded_file, question):
-    """PDF问答代理"""
-    model = ChatOpenAI(
-        model='gpt-3.5-turbo',
-        openai_api_key=api_key,
-        base_url='https://api.openai-hk.com/v1/'
-    )
-
-    # 读取上传的PDF内容
-    file_content = uploaded_file.read()
-
-    # 创建临时文件
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-        temp_file.write(file_content)
-        temp_file_path = temp_file.name
-
-    try:
-        loader = PyPDFLoader(temp_file_path)
-        docs = loader.load()
-
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=50,
-            separators=['\n', '。', '，', '!', '?', ',', '、', '']
-        )
-
-        texts = text_splitter.split_documents(docs)
-
-        embedding_model = OpenAIEmbeddings(
-            openai_api_key=api_key,
-            base_url='https://api.openai-hk.com/v1/',
-            model='text-embedding-3-large'
-        )
-
-        db = FAISS.from_documents(texts, embedding_model)
-        retriever = db.as_retriever()
-
-        qa = ConversationalRetrievalChain.from_llm(
-            llm=model,
-            retriever=retriever,
-            memory=memory
-        )
-
-        response = qa.invoke({'question': question})
-        return response
-    
-    finally:
-        # 清理临时文件
-        if os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
-
-# 页面函数
+# 首页
 def show_home():
     st.title("🎉 欢迎使用AI工具集合")
     
@@ -254,6 +117,7 @@ def show_home():
         - 基于向量检索技术
         """)
 
+# 视频脚本
 def show_video_script():
     st.title("🎬 一键生成视频脚本")
     
@@ -278,7 +142,7 @@ def show_video_script():
                 
             with st.spinner('AI正在思考中,请稍后...'):
                 try:
-                    title, script = generate_script(subject, video_length, creativity, openai_api_key)
+                    title, script = video_generate_script(subject, video_length, creativity, openai_api_key)
                     
                     st.success('✅ 视频脚本已生成')
                     
@@ -309,6 +173,7 @@ def show_video_script():
         - 😊 轻松有趣风格
         """)
 
+# 小红书文案
 def show_xiaohongshu():
     st.title("📝 生成小红书爆款文案")
     
@@ -325,7 +190,7 @@ def show_xiaohongshu():
             
         with st.spinner('AI正在努力创作中,请稍后...'):
             try:
-                result = generate_xiaohongshu(theme, openai_api_key)
+                result = generte_xiaohongshu(theme, openai_api_key)
                 
                 st.success("✅ 小红书文案生成成功！")
                 st.divider()
@@ -344,6 +209,7 @@ def show_xiaohongshu():
             except Exception as e:
                 st.error(f"❌ 生成失败：{str(e)}")
 
+# ChatGPT克隆
 def show_chatgpt_clone():
     st.title("💬 克隆ChatGPT")
     
@@ -386,6 +252,7 @@ def show_chatgpt_clone():
             except Exception as e:
                 st.error(f"❌ 回复失败：{str(e)}")
 
+# PDF问答
 def show_pdf_qa():
     st.title("📄 PDF文档问答工具")
     
