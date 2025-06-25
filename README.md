@@ -2,7 +2,7 @@
 
 本项目是一个基于 Streamlit + LangChain 的多功能 AI 工具集合，集成了视频脚本生成、小红书爆款文案、ChatGPT对话克隆、多文件智能PDF问答等实用AI能力，支持多API接入和多种文档类型。
 
----
+[项目访问地址](https://xiweibing-bot.streamlit.app/):目前存在无法多人同时使用的问题😋
 
 ## ✨ 功能模块
 
@@ -180,7 +180,5 @@ LangChain/
 ## 📞 技术支持
 
 如遇到问题或需要技术支持，请联系开发团队或在 [GitHub Issues](https://github.com/HeShen-1/LangChain/issues) 留言。
-
----
 
 **© 2025 AI工具集合 | 制作团队：傅彬彬，董政，聂群松，何星伽**
