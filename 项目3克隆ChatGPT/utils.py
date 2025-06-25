@@ -96,18 +96,44 @@ def get_chat_response(
         return result["response"]
     else:
         return str(result)
+
+def generate_chat_title(first_question: str, openai_api_key: str) -> str:
+    """
+    基于用户的第一个问题生成聊天标题
+    :param first_question: 用户的第一个问题
+    :param openai_api_key: OpenAI API密钥
+    :return: 生成的聊天标题
+    """
+    try:
+        model = ChatOpenAI(
+            base_url='https://twapi.openai-hk.com/v1/',
+            openai_api_key=openai_api_key,
+            model='gpt-3.5-turbo',
+            streaming=False,
+            temperature=0.3,
+            max_tokens=30
+        )
+        
+        title_prompt = f"""请为以下用户问题生成一个简洁的标题(不超过15个字)，仅返回标题内容：
+用户问题：{first_question}
+
+要求：
+1. 标题要简洁明了，能概括问题核心
+2. 不要包含"关于"、"问题"等词汇
+3. 直接返回标题，不要其他内容"""
+        
+        result = model.invoke(title_prompt)
+        title = result.content.strip()
+        
+        # 如果标题太长，截断处理
+        if len(title) > 15:
+            title = title[:12] + "..."
+            
+        return title
+    except Exception as e:
+        print(f"生成标题失败: {e}")
+        # 如果生成失败，使用前20个字符作为标题
+        return first_question[:20] + "..." if len(first_question) > 20 else first_question
     
 
-if __name__ == "__main__":
-    memory = ConversationBufferMemory()
-    user_chat = "人生呐，能不能放过我这一次。下辈子，做个不会长大的孩子。有人陪伴有人依靠，不会有太多的心事。"
-    response = get_chat_response(user_chat, memory)
-    print("AI 回复：", response)
-    # print("="*100)
-    # user_chat = "看来是不会唱。"
-    # response = get_chat_response(user_chat, memory)
-    # print("AI 回复：", response)
-    # print("="*100)
-    # print("=== 记忆内容 ===")
-    # print(memory.load_memory_variables({}))
     

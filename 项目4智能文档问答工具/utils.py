@@ -193,8 +193,8 @@ def qa_agent(openai_api_key, memory, uploaded_files, question):
             
             db = FAISS.from_documents(texts, embedding_model)
             print("✅ 向量数据库创建成功")
-            # 将向量数据库转换为检索器
-            retriever = db.as_retriever()
+            # 将向量数据库转换为检索器，增加检索数量以获得更好的上下文
+            retriever = db.as_retriever(search_kwargs={"k": 4})
         except Exception as e:
             print(f"❌ 向量数据库创建失败: {e}")
             # 如果还没有使用备选嵌入，现在尝试
@@ -203,7 +203,7 @@ def qa_agent(openai_api_key, memory, uploaded_files, question):
                     print("🔄 尝试使用备选嵌入模型重建数据库...")
                     backup_embedding = get_embed(openai_api_key, force_backup=True)
                     db = FAISS.from_documents(texts, backup_embedding)
-                    retriever = db.as_retriever()
+                    retriever = db.as_retriever(search_kwargs={"k": 4})
                     print("✅ 使用备选嵌入模型重建数据库成功")
                 except Exception as backup_e:
                     return {"answer": f"向量数据库创建失败: {str(e)}\n备选方案也失败: {str(backup_e)}", "source_documents": []}
@@ -212,18 +212,28 @@ def qa_agent(openai_api_key, memory, uploaded_files, question):
 
         # 创建问答链并处理查询
         try:
+            # 创建自定义的问答链，增加对文档相关性的判断
             qa = ConversationalRetrievalChain.from_llm(
                 llm=model,
                 retriever=retriever,
                 memory=memory,
                 return_source_documents=True,
+                combine_docs_chain_kwargs={
+                    "prompt": get_custom_prompt()
+                }
             )
             print("🔄 正在处理问答...")
+            
             # 调用问答链，处理用户问题
             response = qa.invoke({
-                'chat_history': memory.buffer,
-                'question': question
+                'question': question,
+                'chat_history': memory.chat_memory.messages
             })
+            
+            # 检查回答是否找到相关内容
+            if not response.get('source_documents') or len(response.get('source_documents', [])) == 0:
+                response['answer'] = "未在文档中找到相关内容。"
+            
             print("✅ 问答处理成功")
             return response
         except Exception as e:
@@ -234,18 +244,26 @@ def qa_agent(openai_api_key, memory, uploaded_files, question):
                     print("🔄 检测到查询阶段嵌入问题，使用备选方案重建...")
                     backup_embedding = get_embed(openai_api_key, force_backup=True)
                     db_backup = FAISS.from_documents(texts, backup_embedding)
-                    retriever_backup = db_backup.as_retriever()
+                    retriever_backup = db_backup.as_retriever(search_kwargs={"k": 4})
                     
                     qa_backup = ConversationalRetrievalChain.from_llm(
                         llm=model,
                         retriever=retriever_backup,
                         memory=memory,
                         return_source_documents=True,
+                        combine_docs_chain_kwargs={
+                            "prompt": get_custom_prompt()
+                        }
                     )
                     response = qa_backup.invoke({
-                        'chat_history': memory.buffer,
-                        'question': question
+                        'question': question,
+                        'chat_history': memory.chat_memory.messages
                     })
+                    
+                    # 检查回答是否找到相关内容
+                    if not response.get('source_documents') or len(response.get('source_documents', [])) == 0:
+                        response['answer'] = "未在文档中找到相关内容。"
+                        
                     print("✅ 备选方案问答处理成功")
                     return response
                 except Exception as backup_e:
@@ -257,9 +275,76 @@ def qa_agent(openai_api_key, memory, uploaded_files, question):
         return {"answer": f"系统错误: {str(e)}", "source_documents": []}
 
 
-def gen_followup_questions(question, answer, openai_api_key):
+def get_custom_prompt():
     """
-    根据当前问题和答案生成三个后续可能的提问
+    创建自定义的问答提示词模板，确保回答基于文档内容
+    """
+    from langchain.prompts import PromptTemplate
+    
+    template = """使用以下文档片段来回答问题。如果文档中没有相关信息来回答问题，请明确回复"未在文档中找到相关内容。"
+
+文档内容:
+{context}
+
+问题: {question}
+
+回答:"""
+    
+    return PromptTemplate(
+        template=template,
+        input_variables=["context", "question"]
+    )
+
+
+def gen_followup_questions(uploaded_files, openai_api_key):
+    """
+    基于上传的文档内容生成建议问题
+    :param uploaded_files: 上传的文件列表
+    :param openai_api_key: OpenAI API密钥
+    :return: 建议问题列表
+    """
+    if not openai_api_key or not uploaded_files:
+        return []
+        
+    try:
+        # 加载文档内容
+        docs = load_documents(uploaded_files)
+        if not docs:
+            return []
+        
+        # 获取文档的前几段内容作为上下文
+        doc_content = ""
+        for doc in docs[:3]:  # 只使用前3个文档
+            content = doc.page_content[:500]  # 每个文档取前500字符
+            doc_content += f"文档内容片段: {content}\n\n"
+        
+        prompt = (
+            "你是一个智能文档分析助手。基于以下文档内容，生成3个用户可能会询问的相关问题。\n\n"
+            f"{doc_content}\n"
+            "请根据文档的实际内容生成问题，确保问题都能在文档中找到答案。"
+            "只返回问题本身，每个问题一行，不要编号。"
+        )
+        
+        # 使用OpenAI接口生成问题
+        from langchain_openai import ChatOpenAI
+        model = ChatOpenAI(
+            model='gpt-3.5-turbo',
+            api_key=openai_api_key,
+            base_url='https://twapi.openai-hk.com/v1/'
+        )
+        resp = model.invoke([{"role": "user", "content": prompt}])
+        
+        # 解析返回的文本为问题列表
+        questions = [line.strip() for line in resp.content.split('\n') if line.strip() and not line.strip().startswith(('1.', '2.', '3.', '-', '•'))]
+        return questions[:3]
+    except Exception as e:
+        print(f"生成建议问题失败: {e}")
+        return []
+
+
+def gen_followup_questions_from_qa(question, answer, openai_api_key):
+    """
+    根据当前问题和答案生成三个后续可能的提问（保留原函数作为备用）
     """
     if not openai_api_key:
         return []

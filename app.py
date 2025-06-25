@@ -10,8 +10,8 @@ from 项目1视频脚本一键生成器.utils import (
 )
 from 项目1视频脚本一键生成器.utils import generate_script as video_generate_script
 from 项目2小红书爆款文案生成器.utils import generate_xiaohongshu, get_all_baidu_image_urls
-from 项目3克隆ChatGPT.utils import get_chat_response, get_chat_response_stream
-from 项目4智能PDF问答工具.utils import load_documents, qa_agent, gen_followup_questions
+from 项目3克隆ChatGPT.utils import get_chat_response, get_chat_response_stream, generate_chat_title
+from 项目4智能文档问答工具.utils import load_documents, qa_agent, gen_followup_questions, gen_followup_questions_from_qa
 from langchain.memory import ConversationBufferMemory
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.schema import HumanMessage, AIMessage
@@ -231,8 +231,8 @@ with st.sidebar:
     if st.button("💬 克隆ChatGPT", use_container_width=True):
         st.session_state.selected_page = "ChatGPT克隆"
     
-    if st.button("📄 PDF文档问答工具", use_container_width=True):
-        st.session_state.selected_page = "PDF问答"
+    if st.button("📄 智能文档问答工具", use_container_width=True):
+        st.session_state.selected_page = "智能文档问答"
     
     st.markdown("---")
     st.markdown("### 📞 联系我们")
@@ -266,7 +266,7 @@ def show_home():
         st.markdown("""
         <div class="card" style="background: linear-gradient(135deg, #667eea 0%,rgb(73, 127, 226) 100%);">
             <h3 style="color: #ffffff; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-                🎬 一键生成视频脚本
+                🎬 一键生成视频脚本---何星伽
             </h3>
             <ul style="color: #e2e8f0; font-size: 1.1rem; font-weight: 500;">
                 <li>快速生成各类视频脚本</li>
@@ -280,7 +280,7 @@ def show_home():
         st.markdown("""
         <div class="card" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
             <h3 style="color: #7c2d12; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.5);">
-                📝 生成小红书爆款文案
+                📝 生成小红书爆款文案---董政
             </h3>
             <ul style="color: #7c2d12; font-size: 1.1rem; font-weight: 500;">
                 <li>智能生成小红书文案</li>
@@ -295,7 +295,7 @@ def show_home():
         st.markdown("""
         <div class="card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
             <h3 style="color: #1e293b; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.5);">
-                💬 克隆ChatGPT
+                💬 克隆ChatGPT---聂群松
             </h3>
             <ul style="color: #1e293b; font-size: 1.1rem; font-weight: 500;">
                 <li>智能对话系统</li>
@@ -309,7 +309,7 @@ def show_home():
         st.markdown("""
         <div class="card" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
             <h3 style="color: #7c2d12; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.5);">
-                📄 PDF文档问答工具
+                📄 智能文档问答工具---傅彬彬
             </h3>
             <ul style="color: #7c2d12; font-size: 1.1rem; font-weight: 500;">
                 <li>上传PDF文档</li>
@@ -841,8 +841,6 @@ def display_script_result(result, is_history_view=False):
             if st.button("📋 复制全部内容", use_container_width=True, key=f"copy_{unique_key}"):
                 st.text_area("复制以下内容:", value=full_content, height=200, key=f"copy_area_{unique_key}")
 
-# ------------------------------------------
-
 # 小红书文案
 def show_xiaohongshu():
     STYLES = ["幽默调侃", "专业干货", "亲切治愈", "活泼种草"]
@@ -1173,12 +1171,72 @@ def show_chatgpt_clone():
         st.session_state['history_list'] = []  # 每条为 {'name': timestamp, 'messages': [...]}
     if 'active_history' not in st.session_state:
         st.session_state['active_history'] = None
+    if 'first_question_in_session' not in st.session_state:
+        st.session_state['first_question_in_session'] = None
+    
+    # 初始化默认参数
+    if "chat_model" not in st.session_state:
+        st.session_state["chat_model"] = "gpt-3.5-turbo"
+    if "temperature" not in st.session_state:
+        st.session_state["temperature"] = 0.7
+    if "top_p" not in st.session_state:
+        st.session_state["top_p"] = 1.0
+    if "presence_penalty" not in st.session_state:
+        st.session_state["presence_penalty"] = 0.0
+    if "max_tokens" not in st.session_state:
+        st.session_state["max_tokens"] = 1000
+    if "system_prompt" not in st.session_state:
+        st.session_state["system_prompt"] = "你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。"
 
     # ------------------------ 标签页 ------------------------
-    tab1, tab2 = st.tabs(["当前聊天", "历史消息"])
+    tab1, tab2, tab3 = st.tabs(["当前聊天", "历史消息", "角色设定"])
 
     # ======================== 当前聊天 Tab ========================
     with tab1:
+        # 新建对话按钮和当前角色显示
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            if st.button("🗨️ 新建对话", use_container_width=True):
+                # 如果当前有对话且不是默认状态，保存到历史
+                if len(st.session_state['messages']) > 1 and st.session_state['first_question_in_session']:
+                    # 生成聊天标题
+                    try:
+                        chat_title = generate_chat_title(st.session_state['first_question_in_session'], openai_api_key)
+                    except:
+                        chat_title = st.session_state['first_question_in_session'][:20] + "..."
+                    
+                    st.session_state['history_list'].append({
+                        'name': chat_title,
+                        'messages': st.session_state['messages'].copy()
+                    })
+                
+                # 重置当前对话
+                st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
+                st.session_state['messages'] = [{'role': 'ai', 'content': '你好，我是你的AI助手，有什么可以帮你的吗？'}]
+                st.session_state['first_question_in_session'] = None
+                st.session_state['active_history'] = None
+                st.rerun()
+        
+        with col2:
+            # 显示当前角色信息
+            current_role = "默认助手"
+            role_options = {
+                "你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。": "默认助手",
+                "你是一个专业的编程助手，擅长多种编程语言，能够提供代码示例、调试建议和最佳实践。请用简洁明了的方式回答编程相关问题。": "编程助手",
+                "你是一个耐心的学习导师，擅长用通俗易懂的方式解释复杂概念，能够根据学习者的水平调整讲解深度。请用循序渐进的方式回答问题。": "学习导师",
+                "你是一个富有创造力的写手，擅长创作故事、写作建议和文案策划。请用生动有趣的语言风格回答问题，并提供有创意的建议。": "创意写手"
+            }
+            
+            # 确定当前角色
+            current_system_prompt = st.session_state.get("system_prompt", "你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。")
+            if current_system_prompt in role_options:
+                current_role = role_options[current_system_prompt]
+            elif current_system_prompt != "你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。":
+                current_role = st.session_state.get("current_custom_role_name", "自定义角色")
+            
+            st.info(f"🎭 当前角色：**{current_role}**  |  💡 在【角色设定】标签页中可以更换角色")
+        
         # 聊天历史 container
         chat_container = st.container()
         with chat_container:
@@ -1193,113 +1251,238 @@ def show_chatgpt_clone():
                 prompt = st.chat_input("请输入您的问题...")
             with cols[1]:
                 with st.popover("⚙️", use_container_width=True):
-                    st.markdown("### 聊天设置")
-                    stream_mode = st.toggle("🚀 启用流式输出", value=True, key="stream_toggle")
+                    st.markdown("### 🤖 模型参数设置")
+                    model_list = ["gpt-3.5-turbo", "gpt-4"]
+                    st.session_state["chat_model"] = st.selectbox("选择模型", model_list, 
+                                                                 index=model_list.index(st.session_state["chat_model"]) if st.session_state["chat_model"] in model_list else 0)
+                    st.session_state["temperature"] = st.slider("temperature (创造力)", 0.0, 1.5, st.session_state["temperature"], 0.1)
+                    st.session_state["top_p"] = st.slider("top_p (采样范围)", 0.0, 1.0, st.session_state["top_p"], 0.1)
+                    st.session_state["presence_penalty"] = st.slider("presence_penalty (重复惩罚)", -2.0, 2.0, st.session_state["presence_penalty"], 0.1)
+                    st.session_state["max_tokens"] = st.slider("max_tokens (最大回复长度)", 100, 4000, st.session_state["max_tokens"], 100)
 
                     if st.button("🗑️ 清空对话", key="clear_chat_button"):
                         st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
                         st.session_state['messages'] = [{'role': 'ai', 'content': '你好，我是你的AI助手，有什么可以帮你的吗？'}]
+                        st.session_state['first_question_in_session'] = None
                         st.rerun()
 
-                    st.markdown("### 🤖 模型参数设置")
-                    model_list = ["gpt-3.5-turbo", "gpt-4"]
-                    st.session_state["chat_model"] = st.selectbox("选择模型", model_list, index=0)
-                    st.session_state["temperature"] = st.slider("temperature (创造力)", 0.0, 1.5, 0.7, 0.1)
-                    st.session_state["top_p"] = st.slider("top_p (采样范围)", 0.0, 1.0, 1.0, 0.1)
-                    st.session_state["presence_penalty"] = st.slider("presence_penalty (重复惩罚)", -2.0, 2.0, 0.0, 0.1)
-                    st.session_state["max_tokens"] = st.slider("max_tokens (最大回复长度)", 100, 4000, 1000, 100)
-
-                    st.markdown("### 🎭 角色设定")
-                    st.session_state["system_prompt"] = st.text_area(
-                        "给GPT设定一个身份，也可以告诉它你想要得到什么样格式的回答。",
-                        value="你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。",
-                        height=68
-                    )
-
-        # 聊天响应逻辑
+        # 聊天响应逻辑 - 默认使用流式输出
         if prompt:
+            # 记录第一个问题
+            if st.session_state['first_question_in_session'] is None:
+                st.session_state['first_question_in_session'] = prompt
+            
             st.session_state['messages'].append({'role': 'human', 'content': prompt})
             chat_container.chat_message('human').write(prompt)
 
-            stream_mode = st.session_state.get("stream_toggle", True)
-            if stream_mode:
-                message_placeholder = chat_container.chat_message("ai").empty()
-                full_response = ""
-                try:
-                    for chunk in get_chat_response_stream(
-                        prompt=prompt,
-                        memory=st.session_state["memory"],
-                        openai_api_key=openai_api_key,
-                        model_name=st.session_state["chat_model"],
-                        temperature=st.session_state["temperature"],
-                        top_p=st.session_state["top_p"],
-                        presence_penalty=st.session_state["presence_penalty"],
-                        max_tokens=st.session_state["max_tokens"],
-                        system_prompt=st.session_state["system_prompt"]
-                    ):
-                        if "response" in chunk:
-                            full_response += chunk['response']
-                            message_placeholder.markdown(full_response + "▌")
-                    message_placeholder.markdown(full_response)
-                    st.session_state['messages'].append({'role': 'ai', 'content': full_response})
-                except Exception as e:
-                    st.error(f"❌ 回复失败：{e}")
-            else:
-                with st.spinner("Thinking..."):
-                    try:
-                        full_response = get_chat_response(
-                            prompt=prompt,
-                            memory=st.session_state['memory'],
-                            openai_api_key=openai_api_key,
-                            model_name=st.session_state["chat_model"],
-                            temperature=st.session_state["temperature"],
-                            top_p=st.session_state["top_p"],
-                            presence_penalty=st.session_state["presence_penalty"],
-                            max_tokens=st.session_state["max_tokens"],
-                            system_prompt=st.session_state["system_prompt"]
-                        )
-                        chat_container.chat_message("ai").write(full_response)
-                        st.session_state['messages'].append({'role': 'ai', 'content': full_response})
-                    except Exception as e:
-                        st.error(f"❌ 回复失败：{e}")
+            # 使用流式输出
+            message_placeholder = chat_container.chat_message("ai").empty()
+            full_response = ""
+            try:
+                for chunk in get_chat_response_stream(
+                    prompt=prompt,
+                    memory=st.session_state["memory"],
+                    openai_api_key=openai_api_key,
+                    model_name=st.session_state["chat_model"],
+                    temperature=st.session_state["temperature"],
+                    top_p=st.session_state["top_p"],
+                    presence_penalty=st.session_state["presence_penalty"],
+                    max_tokens=st.session_state["max_tokens"],
+                    system_prompt=st.session_state["system_prompt"]
+                ):
+                    if "response" in chunk:
+                        full_response += chunk['response']
+                        message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
+                st.session_state['messages'].append({'role': 'ai', 'content': full_response})
+            except Exception as e:
+                st.error(f"❌ 回复失败：{e}")
+
+    # ======================== 角色设定 Tab ========================
+    with tab3:
+        st.markdown("### 🎭 角色设定")
+        
+        # 角色设定选择器
+        role_options = {
+            "默认助手": "你是ChatGPT，一个由OpenAI训练的大语言模型，请简洁而专业地回答用户问题。",
+            "编程助手": "你是一个专业的编程助手，擅长多种编程语言，能够提供代码示例、调试建议和最佳实践。请用简洁明了的方式回答编程相关问题。",
+            "学习导师": "你是一个耐心的学习导师，擅长用通俗易懂的方式解释复杂概念，能够根据学习者的水平调整讲解深度。请用循序渐进的方式回答问题。",
+            "创意写手": "你是一个富有创造力的写手，擅长创作故事、写作建议和文案策划。请用生动有趣的语言风格回答问题，并提供有创意的建议。",
+            "自定义角色": "custom"
+        }
+        
+        # 初始化自定义角色提示词和保存的角色列表
+        if "custom_system_prompt" not in st.session_state:
+            st.session_state["custom_system_prompt"] = "请输入你的自定义角色设定..."
+        if "saved_custom_roles" not in st.session_state:
+            st.session_state["saved_custom_roles"] = {}
+        if "show_custom_role_modal" not in st.session_state:
+            st.session_state["show_custom_role_modal"] = False
+        if "current_custom_role_name" not in st.session_state:
+            st.session_state["current_custom_role_name"] = "自定义角色"
+        
+        # 动态更新角色选项显示
+        display_role_options = role_options.copy()
+        if st.session_state.get("current_custom_role_name") and st.session_state.get("current_custom_role_name") != "自定义角色":
+            display_role_options["自定义角色"] = f"自定义角色 ({st.session_state['current_custom_role_name']})"
+        
+        selected_role = st.selectbox(
+            "🎭 选择角色设定",
+            list(display_role_options.keys()),
+            key="role_selector",
+            format_func=lambda x: display_role_options.get(x, x) if x == "自定义角色" else x
+        )
+        
+        # 如果选择自定义角色，显示设置界面
+        if selected_role == "自定义角色":
+            st.markdown("---")
+            st.markdown("### 🎭 自定义角色设置")
+            
+            # 角色名称设置
+            role_display_name = st.text_input(
+                "🏷️ 角色名称",
+                value=st.session_state["current_custom_role_name"],
+                placeholder="给你的自定义角色起个名字",
+                help="这个名称将显示在角色选择器中"
+            )
+            
+            # 角色设定输入
+            custom_prompt = st.text_area(
+                "✍️ 角色设定",
+                value=st.session_state["custom_system_prompt"],
+                height=120,
+                placeholder="例如：你是一个专业的心理咨询师，擅长倾听和提供情感支持。请用温和、理解的语气回答问题，并提供建设性的建议。",
+                help="请详细描述你希望AI扮演的角色特征、专业领域和回答风格"
+            )
+            
+            # 快速示例选择
+            st.markdown("#### 💡 快速选择示例角色")
+            example_roles = {
+                "心理咨询师": "你是一个专业的心理咨询师，擅长倾听和提供情感支持。请用温和、理解的语气回答问题，并提供建设性的建议。",
+                "旅行规划师": "你是一个经验丰富的旅行规划师，熟悉世界各地的旅游景点、交通、住宿和美食。请为用户提供详细的旅行建议和规划。",
+                "健身教练": "你是一个专业的健身教练，了解各种运动形式、营养搭配和健康生活方式。请用激励性的语言提供健身建议。",
+                "美食评论家": "你是一个资深的美食评论家，对各地美食文化有深入了解。请用生动的语言描述美食，并提供烹饪技巧和餐厅推荐。"
+            }
+            
+            cols = st.columns(2)
+            for i, (example_name, example_prompt) in enumerate(example_roles.items()):
+                col = cols[i % 2]
+                with col:
+                    if st.button(f"📝 {example_name}", key=f"example_role_{i}", use_container_width=True):
+                        st.session_state["custom_system_prompt"] = example_prompt
+                        st.session_state["current_custom_role_name"] = example_name
+                        st.rerun()
+            
+            # 已保存角色管理
+            if st.session_state["saved_custom_roles"]:
+                st.markdown("#### 📁 已保存的角色")
+                saved_role_names = list(st.session_state["saved_custom_roles"].keys())
+                
+                col_select, col_load, col_delete = st.columns([2, 1, 1])
+                with col_select:
+                    selected_saved_role = st.selectbox(
+                        "选择已保存的角色",
+                        [""] + saved_role_names,
+                        key="select_saved_role"
+                    )
+                with col_load:
+                    if st.button("📂 加载", key="load_saved_role", use_container_width=True):
+                        if selected_saved_role:
+                            st.session_state["custom_system_prompt"] = st.session_state["saved_custom_roles"][selected_saved_role]
+                            st.session_state["current_custom_role_name"] = selected_saved_role
+                            st.success(f"✅ 已加载角色 '{selected_saved_role}'")
+                            st.rerun()
+                with col_delete:
+                    if st.button("🗑️ 删除", key="delete_saved_role", use_container_width=True):
+                        if selected_saved_role:
+                            del st.session_state["saved_custom_roles"][selected_saved_role]
+                            st.success(f"✅ 已删除角色 '{selected_saved_role}'")
+                            st.rerun()
+            
+            # 操作按钮
+            st.markdown("---")
+            col_save, col_apply = st.columns(2)
+            
+            with col_save:
+                save_name = st.text_input("💾 保存为", placeholder="输入保存名称", key="save_role_name")
+                if st.button("💾 保存角色", key="save_custom_role", use_container_width=True):
+                    if save_name and custom_prompt and custom_prompt != "请输入你的自定义角色设定...":
+                        st.session_state["saved_custom_roles"][save_name] = custom_prompt
+                        st.success(f"✅ 角色 '{save_name}' 已保存")
+                    else:
+                        st.warning("⚠️ 请输入保存名称和有效的角色设定")
+            
+            with col_apply:
+                if st.button("✅ 应用设置", key="apply_custom_role", use_container_width=True, type="primary"):
+                    if custom_prompt and custom_prompt != "请输入你的自定义角色设定...":
+                        st.session_state["custom_system_prompt"] = custom_prompt
+                        st.session_state["system_prompt"] = custom_prompt
+                        if role_display_name:
+                            st.session_state["current_custom_role_name"] = role_display_name
+                        st.success("✅ 自定义角色设置已应用")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ 请输入有效的角色设定")
+            
+            # 应用自定义角色设定
+            st.session_state["system_prompt"] = st.session_state["custom_system_prompt"]
+        else:
+            # 使用预设角色
+            if st.session_state["system_prompt"] != role_options[selected_role]:
+                st.session_state["system_prompt"] = role_options[selected_role]
+                st.rerun()
+            
+            # 显示当前角色的设定信息
+            st.markdown("---")
+            st.markdown("### 📋 当前角色信息")
+            st.info(f"**角色：** {selected_role}")
+            st.text_area("角色设定内容", value=role_options[selected_role], height=100, disabled=True)
 
     # ======================== 历史消息 Tab ========================
     with tab2:
-        if st.button("+ 新建对话", use_container_width=True):
-            # 创建新记录并切换
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.session_state['history_list'].append({
-                'name': timestamp,
-                'messages': [{'role': 'ai', 'content': '你好，我是你的AI助手，有什么可以帮你的吗？'}]
-            })
-            st.session_state['messages'] = st.session_state['history_list'][-1]['messages']
-            st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
-            st.session_state['active_history'] = len(st.session_state['history_list']) - 1
-            st.rerun()
-
-        for idx, record in enumerate(st.session_state['history_list']):
-            with st.container():
-                col1, col2 = st.columns([0.9, 0.1])
-                with col1:
-                    if st.button(record['name'], key=f"load_{idx}", use_container_width=True):
-                        st.session_state['messages'] = record['messages']
-                        st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
-                        st.session_state['active_history'] = idx
-                        st.rerun()
-                with col2:
-                    with st.expander("..."):
-                        if st.button("删除", key=f"delete_{idx}"):
-                            st.session_state['history_list'].pop(idx)
-                            if st.session_state['active_history'] == idx:
-                                st.session_state['messages'] = [{'role': 'ai', 'content': '你好，我是你的AI助手，有什么可以帮你的吗？'}]
-                                st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
-                                st.session_state['active_history'] = None
+        if not st.session_state['history_list']:
+            st.info("暂无历史对话记录")
+            st.markdown("💡 **提示**: 在当前聊天中点击「新建对话」可以保存当前对话到历史记录")
+        else:
+            for idx, record in enumerate(st.session_state['history_list']):
+                with st.container():
+                    col1, col2 = st.columns([0.9, 0.1])
+                    with col1:
+                        if st.button(record['name'], key=f"load_{idx}", use_container_width=True):
+                            st.session_state['messages'] = record['messages']
+                            st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
+                            st.session_state['active_history'] = idx
+                            # 重建memory
+                            for msg in record['messages']:
+                                if msg['role'] == 'human':
+                                    st.session_state['memory'].save_context(
+                                        {"input": msg['content']}, 
+                                        {"output": ""}
+                                    )
+                                elif msg['role'] == 'ai' and msg['content'] != '你好，我是你的AI助手，有什么可以帮你的吗？':
+                                    # 获取对应的human消息
+                                    human_msgs = [m for m in record['messages'] if m['role'] == 'human']
+                                    if human_msgs:
+                                        last_human = human_msgs[-1]['content']
+                                        st.session_state['memory'].save_context(
+                                            {"input": last_human}, 
+                                            {"output": msg['content']}
+                                        )
                             st.rerun()
+                    with col2:
+                        with st.expander("..."):
+                            if st.button("删除", key=f"delete_{idx}"):
+                                st.session_state['history_list'].pop(idx)
+                                if st.session_state['active_history'] == idx:
+                                    st.session_state['messages'] = [{'role': 'ai', 'content': '你好，我是你的AI助手，有什么可以帮你的吗？'}]
+                                    st.session_state['memory'] = ConversationBufferMemory(return_messages=True)
+                                    st.session_state['active_history'] = None
+                                    st.session_state['first_question_in_session'] = None
+                                st.rerun()
 
-# PDF智能问答
+# 智能文档问答
 def show_pdf_qa():
-    st.markdown('<div class="main-title">📄 PDF智能问答工具</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">📄 智能文档问答工具</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle">上传文档，智能问答，快速获取信息</div>', unsafe_allow_html=True)
     
     # 使用全局API密钥
@@ -1307,8 +1490,7 @@ def show_pdf_qa():
     
     # 显示API密钥状态
     if not openai_key:
-        st.warning("⚠️ 请在左侧侧栏输入API密钥以使用智能问答功能")
-        st.info("📝 **使用说明**: 请先在侧栏输入OpenAI API密钥，然后上传文档开始智能问答")
+        st.warning("⚠️ 请在左侧侧栏输入OpenAI API密钥以使用智能问答功能")
         return
     
     # 使用一个列表缓存历史记录
@@ -1326,11 +1508,34 @@ def show_pdf_qa():
             accept_multiple_files=True,
             help="可以同时上传多个文档进行问答"
         )
+        
+        # 当文档上传后，自动生成基于文档内容的建议问题
+        if upload_files and 'document_suggestions_generated' not in st.session_state:
+            with st.spinner("📄 正在分析文档内容，生成建议问题..."):
+                document_suggestions = gen_followup_questions(upload_files, openai_key)
+                st.session_state['document_suggestions'] = document_suggestions
+                st.session_state['document_suggestions_generated'] = True
+        elif not upload_files and 'document_suggestions_generated' in st.session_state:
+            # 清理文档相关的建议问题
+            if 'document_suggestions' in st.session_state:
+                del st.session_state['document_suggestions']
+            del st.session_state['document_suggestions_generated']
     
     with col2:
         st.markdown("### 🗨️ 对话管理")
         # 新建对话按钮
         if st.button("🗨️ 新建对话", use_container_width=True):
+            # 保存当前对话到历史记录（如果有对话内容）
+            if 'memory' in st.session_state and st.session_state['memory'].buffer:
+                session_data = {
+                    'memory': st.session_state['memory'],
+                    'chat_history': st.session_state.get('chat_history', []),
+                    'followup_questions': st.session_state.get('followup_questions', []),
+                    'last_question': st.session_state.get('last_question', "")
+                }
+                st.session_state['history_cache'].append(session_data)
+            
+            # 创建新对话
             st.session_state['memory'] = ConversationBufferMemory(
                 return_messages=True,
                 memory_key='chat_history',
@@ -1341,15 +1546,6 @@ def show_pdf_qa():
             st.session_state['last_question'] = ""
             st.session_state['user_input'] = ""
             st.success("新对话已开始！")
-
-            # 新会话开始后保存到历史记录
-            session_data = {
-                'memory': st.session_state['memory'],
-                'chat_history': st.session_state['chat_history'],
-                'followup_questions': st.session_state['followup_questions'],
-                'last_question': st.session_state['last_question']
-            }
-            st.session_state['history_cache'].append(session_data)
 
     with col3:
         st.markdown("### 📚 历史对话")
@@ -1471,15 +1667,35 @@ def show_pdf_qa():
     # ====== 固定底部输入区 ======
     st.markdown('<div class="fixed-bottom-bar">', unsafe_allow_html=True)
 
-    # 预测问题按钮区
+    # 建议问题按钮区
     selected_question = None
-    if st.session_state['followup_questions']:
-        st.markdown("**💡 建议问题：**")
+    
+    # 优先显示基于文档的建议问题
+    document_suggestions = st.session_state.get('document_suggestions', [])
+    followup_suggestions = st.session_state.get('followup_questions', [])
+    
+    if document_suggestions and not followup_suggestions:
+        st.markdown("**📋 基于文档内容的建议问题：**")
         cols = st.columns(3)
-        for idx, q in enumerate(st.session_state['followup_questions']):
+        for idx, q in enumerate(document_suggestions[:3]):
+            if cols[idx].button(q, key=f"doc_suggest_{idx}", help="点击直接提问", use_container_width=True):
+                selected_question = q
+                break
+    elif followup_suggestions:
+        st.markdown("**💡 后续问题建议：**")
+        cols = st.columns(3)
+        for idx, q in enumerate(followup_suggestions[:3]):
             if cols[idx].button(q, key=f"followup_{idx}", help="点击直接提问", use_container_width=True):
                 selected_question = q
                 break
+    elif document_suggestions:
+        # 如果已经有对话，但还想显示文档建议问题
+        with st.expander("📋 查看基于文档内容的建议问题"):
+            doc_cols = st.columns(3)
+            for idx, q in enumerate(document_suggestions[:3]):
+                if doc_cols[idx].button(q, key=f"doc_suggest_exp_{idx}", help="点击直接提问", use_container_width=True):
+                    selected_question = q
+                    break
 
     # 用st.chat_input美化输入框
     input_placeholder = "请输入您的问题..." if upload_files else "请先上传文档，然后输入问题"
@@ -1517,10 +1733,11 @@ def show_pdf_qa():
             except Exception as e:
                 status_placeholder.error(f"❌ 处理失败: {str(e)}")
                 st.stop()
-        # 不再手动追加chat_history，交由memory维护
+        # 更新状态
         st.session_state['last_question'] = question
 
-        st.session_state['followup_questions'] = gen_followup_questions(
+        # 生成基于当前问答的后续问题建议
+        st.session_state['followup_questions'] = gen_followup_questions_from_qa(
             question=question,
             answer=response['answer'],
             openai_api_key=openai_key
@@ -1529,7 +1746,7 @@ def show_pdf_qa():
         st.session_state["user_input"] = ""
 
         # 将来源信息添加到AI消息中
-        if response['source_documents']:
+        if response.get('source_documents'):
             # 找到最新的AI消息并添加来源信息
             messages = st.session_state['memory'].load_memory_variables({}).get('chat_history', [])
             if messages and isinstance(messages[-1], AIMessage):
@@ -1548,7 +1765,7 @@ elif st.session_state.selected_page == "小红书文案":
     show_xiaohongshu()
 elif st.session_state.selected_page == "ChatGPT克隆":
     show_chatgpt_clone()
-elif st.session_state.selected_page == "PDF问答":
+elif st.session_state.selected_page == "智能文档问答":
     show_pdf_qa()
 
 # 页脚
