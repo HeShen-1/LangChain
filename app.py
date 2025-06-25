@@ -1299,36 +1299,38 @@ def show_chatgpt_clone():
 
 # PDF智能问答
 def show_pdf_qa():
+    st.markdown('<div class="main-title">📄 PDF智能问答工具</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">上传文档，智能问答，快速获取信息</div>', unsafe_allow_html=True)
+    
+    # 使用全局API密钥
+    openai_key = openai_api_key
+    
+    # 显示API密钥状态
+    if not openai_key:
+        st.warning("⚠️ 请在左侧侧栏输入API密钥以使用智能问答功能")
+        st.info("📝 **使用说明**: 请先在侧栏输入OpenAI API密钥，然后上传文档开始智能问答")
+        return
+    
     # 使用一个列表缓存历史记录
     if 'history_cache' not in st.session_state:
         st.session_state['history_cache'] = []
 
-    st.set_page_config(page_title="多文件智能问答助手", layout="wide")
-
-    # ====== 顶部配置区域 ======
-    st.markdown("### 🤖 智能问答助手配置区")
-    col1, col2 = st.columns([2, 1])  # 左侧2份宽度，右侧1份宽度
-
+    # ====== 文件上传和操作区域 ======
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
     with col1:
-        openai_key = st.text_input('请输入OpenAI API密钥', type='password')
-        st.markdown('[获取OpenAI API秘钥](https://openai-hk.com/v3/ai/key)')
-
-    with col2:
-        st.markdown("### 支持的文件类型")
-        st.info("PDF, TXT, CSV, DOCX")
+        st.markdown("### 📁 上传文档")
         upload_files = st.file_uploader(
-            "上传文件",
+            "支持: PDF, TXT, CSV, DOCX",
             type=["pdf", "txt", "csv", "docx"],
-            accept_multiple_files=True
+            accept_multiple_files=True,
+            help="可以同时上传多个文档进行问答"
         )
-
-    # ====== 操作按钮区域 ======
-    st.markdown("---")  # 分隔线
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
+    
+    with col2:
+        st.markdown("### 🗨️ 对话管理")
         # 新建对话按钮
-        if st.button("新建对话"):
+        if st.button("🗨️ 新建对话", use_container_width=True):
             st.session_state['memory'] = ConversationBufferMemory(
                 return_messages=True,
                 memory_key='chat_history',
@@ -1349,25 +1351,28 @@ def show_pdf_qa():
             }
             st.session_state['history_cache'].append(session_data)
 
-    with col2:
-        # 历史记录区域
-        st.markdown("### 历史记录")
+    with col3:
+        st.markdown("### 📚 历史对话")
         if st.session_state['history_cache']:
             # 使用下拉框选择历史记录（更节省空间）
             history_idx = st.selectbox(
                 "选择历史对话",
-                list(range(1, len(st.session_state['history_cache']) + 1))
+                list(range(1, len(st.session_state['history_cache']) + 1)),
+                key="history_select"
             )
-            if st.button(f"加载 历史对话 {history_idx}"):
+            if st.button(f"📂 加载对话 {history_idx}", use_container_width=True):
                 history = st.session_state['history_cache'][history_idx - 1]
                 st.session_state['memory'] = history['memory']
                 st.session_state['chat_history'] = history['chat_history']
                 st.session_state['followup_questions'] = history['followup_questions']
                 st.session_state['last_question'] = history['last_question']
                 st.session_state['user_input'] = ""
-                st.success(f"已加载 历史对话 {history_idx}")
+                st.success(f"已加载对话 {history_idx}")
         else:
-            st.info("没有历史记录。")
+            st.info("暂无历史对话")
+    
+    # 分隔线
+    st.markdown("---")
 
     # ====== 会话状态初始化 ======
     if 'memory' not in st.session_state:
@@ -1467,52 +1472,70 @@ def show_pdf_qa():
     st.markdown('<div class="fixed-bottom-bar">', unsafe_allow_html=True)
 
     # 预测问题按钮区
-    cols = st.columns(3)
-    for idx, q in enumerate(st.session_state['followup_questions']):
-        if cols[idx].button(q, key=f"followup_{idx}", help="点击填入输入框"):
-            st.session_state['user_input'] = q
+    selected_question = None
+    if st.session_state['followup_questions']:
+        st.markdown("**💡 建议问题：**")
+        cols = st.columns(3)
+        for idx, q in enumerate(st.session_state['followup_questions']):
+            if cols[idx].button(q, key=f"followup_{idx}", help="点击直接提问", use_container_width=True):
+                selected_question = q
+                break
 
     # 用st.chat_input美化输入框
+    input_placeholder = "请输入您的问题..." if upload_files else "请先上传文档，然后输入问题"
     user_input = st.chat_input(
-        "请输入您的问题",
+        input_placeholder,
         key="user_input_box",
         disabled=not upload_files
     )
+    
+    # 如果用户点击了后续问题按钮，直接使用该问题
+    if selected_question:
+        user_input = selected_question
 
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ====== 处理提问 ======
     if upload_files and user_input:
         if not openai_key:
-            st.info('请输入你的OpenAI API密钥')
+            st.error('❌ API密钥未设置，请在左侧侧栏输入OpenAI API密钥')
             st.stop()
-    question = user_input
-    with st.spinner("AI正在思考中..."):
-        response = qa_agent(
-            openai_api_key=openai_key,
-            memory=st.session_state['memory'],
-            uploaded_files=upload_files,
-            question=question
+        
+        question = user_input
+        with st.spinner("AI正在思考中..."):
+            # 显示处理状态
+            status_placeholder = st.empty()
+            try:
+                status_placeholder.info("🔄 正在加载嵌入模型...")
+                response = qa_agent(
+                    openai_api_key=openai_key,
+                    memory=st.session_state['memory'],
+                    uploaded_files=upload_files,
+                    question=question
+                )
+                status_placeholder.empty()
+            except Exception as e:
+                status_placeholder.error(f"❌ 处理失败: {str(e)}")
+                st.stop()
+        # 不再手动追加chat_history，交由memory维护
+        st.session_state['last_question'] = question
+
+        st.session_state['followup_questions'] = gen_followup_questions(
+            question=question,
+            answer=response['answer'],
+            openai_api_key=openai_key
         )
-    # 不再手动追加chat_history，交由memory维护
-    st.session_state['last_question'] = question
 
-    st.session_state['followup_questions'] = gen_followup_questions(
-        question=question,
-        answer=response['answer'],
-        openai_api_key=openai_key
-    )
+        st.session_state["user_input"] = ""
 
-    st.session_state["user_input"] = ""
+        # 将来源信息添加到AI消息中
+        if response['source_documents']:
+            # 找到最新的AI消息并添加来源信息
+            messages = st.session_state['memory'].load_memory_variables({}).get('chat_history', [])
+            if messages and isinstance(messages[-1], AIMessage):
+                messages[-1].source_documents = response['source_documents']
 
-    # 将来源信息添加到AI消息中
-    if response['source_documents']:
-        # 找到最新的AI消息并添加来源信息
-        messages = st.session_state['memory'].load_memory_variables({}).get('chat_history', [])
-        if messages and isinstance(messages[-1], AIMessage):
-            messages[-1].source_documents = response['source_documents']
-
-    st.rerun()
+        st.rerun()
 
 # 检查PDF智能问答
 
