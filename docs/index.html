@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI工具集合 - 基于LangChain的多功能AI应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .feature h3 {
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .feature p {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-bottom: 1rem;
+        }
+
+        .feature ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .feature li {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .feature li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4ade80;
+        }
+
+        .buttons {
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1.2rem 2.5rem;
+            margin: 0.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: rgba(59, 130, 246, 0.8);
+            border-color: rgba(59, 130, 246, 0.9);
+        }
+
+        .btn-primary:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+
+        .note {
+            margin: 3rem auto;
+            max-width: 800px;
+            padding: 2rem;
+            background: rgba(255, 193, 7, 0.15);
+            border-radius: 15px;
+            border-left: 5px solid #ffc107;
+            backdrop-filter: blur(5px);
+        }
+
+        .note strong {
+            color: #ffc107;
+            font-size: 1.2rem;
+        }
+
+        .code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9rem;
+            margin: 0.2rem;
+            display: inline-block;
+        }
+
+        .updates {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 3rem 0;
+            backdrop-filter: blur(5px);
+        }
+
+        .updates h2 {
+            color: #4ade80;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 4rem;
+            padding: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            opacity: 0.7;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .subtitle {
+                font-size: 1.2rem;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .btn {
+                display: block;
+                margin: 1rem auto;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI工具集合</h1>
+            <p class="subtitle">基于LangChain的多功能AI应用</p>
+            <p>集成视频脚本生成、小红书文案、ChatGPT克隆、PDF智能问答等实用AI功能</p>
+        </header>
+
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">🎬</span>
+                <h3>视频脚本生成器</h3>
+                <p>基于OpenAI GPT智能生成各类视频脚本</p>
+                <ul>
+                    <li>支持多种风格、类型、结构</li>
+                    <li>可选分镜头、BGM、标签</li>
+                    <li>支持历史记录和收藏</li>
+                    <li>Word/PDF一键导出</li>
+                </ul>
+            </div>
+
+            <div class="feature">
+                <span class="feature-icon">📝</span>
+                <h3>小红书文案生成器</h3>
+                <p>基于DeepSeek API的爆款文案生成工具</p>
+                <ul>
+                    <li>多风格文案生成</li>
+                    <li>自动生成标题和正文</li>
+                    <li>智能配图建议</li>
+                    <li>Markdown格式导出</li>
+                </ul>
+            </div>
+
+            <div class="feature">
+                <span class="feature-icon">💬</span>
+                <h3>ChatGPT克隆</h3>
+                <p>完整的对话系统，支持上下文记忆</p>
+                <ul>
+                    <li>多轮对话记忆</li>
+                    <li>流式/非流式输出</li>
+                    <li>模型参数可调</li>
+                    <li>聊天历史管理</li>
+                </ul>
+            </div>
+
+            <div class="feature">
+                <span class="feature-icon">📄</span>
+                <h3>PDF智能问答 (全新升级)</h3>
+                <p>多文件智能问答系统，全新UI设计</p>
+                <ul>
+                    <li>支持PDF/TXT/CSV/DOCX</li>
+                    <li>三栏布局，操作直观</li>
+                    <li>对话管理和历史切换</li>
+                    <li>智能建议问题</li>
+                    <li>答案来源可溯源</li>
+                    <li>固定底部输入栏</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="updates">
+            <h2>🆕 最新更新 (v2.0)</h2>
+            <h3>PDF智能问答工具重大升级</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li>✨ 全新界面设计：采用三栏布局，操作更直观</li>
+                <li>🗨️ 改进的对话管理：一键新建对话，历史对话切换</li>
+                <li>💡 智能问题建议：自动生成追问，一键快速提问</li>
+                <li>🎯 优化的用户体验：固定底部输入栏，实时状态提示</li>
+                <li>📚 增强的功能：多文档同时上传，更稳定的向量检索</li>
+            </ul>
+        </div>
+
+        <div class="buttons">
+            <a href="https://github.com/HeShen-1/LangChain" class="btn btn-primary">📖 查看源码</a>
+            <a href="https://streamlit.io/cloud" class="btn">🚀 Streamlit Cloud</a>
+            <a href="#" class="btn">📱 本地运行</a>
+        </div>
+
+        <div class="note">
+            <strong>💡 使用说明</strong><br><br>
+            由于GitHub Pages不支持Streamlit应用直接运行，请使用以下方式体验完整功能：<br><br>
+
+            <strong>方法一：本地运行</strong><br>
+            1. 克隆仓库：<span class="code">git clone https://github.com/HeShen-1/LangChain.git</span><br>
+            2. 安装依赖：<span class="code">pip install -r requirements.txt</span><br>
+            3. 运行应用：<span class="code">streamlit run app.py</span><br><br>
+
+            <strong>方法二：云端部署</strong><br>
+            推荐使用 Streamlit Cloud、Heroku、Railway 等平台部署<br><br>
+
+            <strong>技术栈：</strong>Streamlit + LangChain + OpenAI GPT + FAISS + HuggingFace Embeddings
+        </div>
+
+        <footer>
+            <p>© 2025 AI工具集合 | 制作团队：傅彬彬，董政，聂群松，何星伽</p>
+            <p>如遇问题请访问 <a href="https://github.com/HeShen-1/LangChain/issues" style="color: #4ade80;">GitHub Issues</a>
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>

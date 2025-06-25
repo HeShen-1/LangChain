@@ -1,0 +1,167 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        lfs: true
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install streamlit-to-heroku
+    
+    - name: Create static site
+      run: |
+        mkdir -p docs
+        echo "<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>AI工具集合 - 基于LangChain的多功能AI应用</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                }
+                .container {
+                    text-align: center;
+                    max-width: 800px;
+                    padding: 2rem;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 20px;
+                    backdrop-filter: blur(10px);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+                }
+                h1 { font-size: 3rem; margin-bottom: 1rem; }
+                .subtitle { font-size: 1.5rem; margin-bottom: 2rem; opacity: 0.9; }
+                .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+                .feature { 
+                    background: rgba(255,255,255,0.1);
+                    padding: 1.5rem;
+                    border-radius: 15px;
+                    backdrop-filter: blur(5px);
+                }
+                .feature h3 { margin-bottom: 0.5rem; }
+                .feature p { font-size: 0.9rem; opacity: 0.8; }
+                .buttons { margin-top: 2rem; }
+                .btn {
+                    display: inline-block;
+                    padding: 1rem 2rem;
+                    margin: 0.5rem;
+                    background: rgba(255,255,255,0.2);
+                    border: 2px solid rgba(255,255,255,0.3);
+                    border-radius: 50px;
+                    color: white;
+                    text-decoration: none;
+                    font-weight: bold;
+                    transition: all 0.3s ease;
+                }
+                .btn:hover {
+                    background: rgba(255,255,255,0.3);
+                    transform: translateY(-2px);
+                }
+                .note {
+                    margin-top: 2rem;
+                    padding: 1rem;
+                    background: rgba(255,193,7,0.2);
+                    border-radius: 10px;
+                    border-left: 4px solid #ffc107;
+                }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <h1>🤖 AI工具集合</h1>
+                <p class='subtitle'>基于LangChain的多功能AI应用</p>
+                
+                <div class='features'>
+                    <div class='feature'>
+                        <h3>🎬 视频脚本生成</h3>
+                        <p>智能生成各类视频脚本，支持多种风格和结构</p>
+                    </div>
+                    <div class='feature'>
+                        <h3>📝 小红书文案</h3>
+                        <p>爆款文案生成器，支持多风格内容创作</p>
+                    </div>
+                    <div class='feature'>
+                        <h3>💬 ChatGPT克隆</h3>
+                        <p>多轮对话，支持上下文记忆和角色设定</p>
+                    </div>
+                    <div class='feature'>
+                        <h3>📄 PDF智能问答</h3>
+                        <p>多文件上传，智能问答，来源可溯源</p>
+                    </div>
+                </div>
+
+                <div class='buttons'>
+                    <a href='https://github.com/HeShen-1/LangChain' class='btn'>📖 查看源码</a>
+                    <a href='https://streamlit.io/cloud' class='btn'>🚀 本地运行</a>
+                </div>
+
+                <div class='note'>
+                    <strong>💡 使用说明：</strong><br>
+                    由于GitHub Pages不支持Streamlit应用直接运行，请使用以下方式体验：<br>
+                    1. 克隆仓库到本地：<code>git clone https://github.com/HeShen-1/LangChain.git</code><br>
+                    2. 安装依赖：<code>pip install -r requirements.txt</code><br>
+                    3. 运行应用：<code>streamlit run app.py</code><br>
+                    4. 或者使用 Streamlit Cloud、Heroku 等平台部署
+                </div>
+
+                <p style='margin-top: 2rem; opacity: 0.7;'>
+                    © 2025 制作团队：傅彬彬，董政，聂群松，何星伽
+                </p>
+            </div>
+        </body>
+        </html>" > docs/index.html
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: './docs'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2 

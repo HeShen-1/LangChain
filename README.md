@@ -29,10 +29,14 @@
 
 ### 📄 PDF多文件智能问答
 
-- 支持 PDF、TXT、CSV、DOCX 多文件上传
-- 基于向量检索（FAISS+HuggingFace Embeddings）
-- 支持多轮对话、上下文记忆、历史切换
-- 自动生成追问建议，答案可溯源
+- **全新UI设计**：分栏布局，操作更直观
+- **多文件支持**：同时上传 PDF、TXT、CSV、DOCX 多个文档
+- **智能问答**：基于向量检索（FAISS+HuggingFace Embeddings）
+- **对话管理**：支持新建对话、历史对话切换、多轮记忆
+- **智能建议**：自动生成追问建议，一键提问
+- **来源溯源**：答案可追溯到具体文档片段
+- **状态提示**：实时显示处理状态和错误信息
+- **优化体验**：固定底部输入栏，聊天界面更友好
 
 ---
 
@@ -90,6 +94,11 @@ LangChain/
 ├── requirements.txt              # 依赖包列表
 ├── README.md                     # 项目说明
 ├── script_history/               # 视频脚本历史记录
+├── paraphrase-multilingual-Mpnet-base-v2/  # 本地嵌入模型
+│   ├── 1_Pooling/
+│   ├── config.json
+│   ├── model.safetensors
+│   └── modules.json
 ├── 项目1视频脚本一键生成器/
 │   └── utils.py                  # 视频脚本生成核心逻辑
 ├── 项目2小红书爆款文案生成器/
@@ -99,10 +108,8 @@ LangChain/
 │   └── readme.md
 ├── 项目3克隆ChatGPT/
 │   └── utils.py                  # ChatGPT对话核心逻辑
-├── 项目4智能PDF问答工具/
-│   ├── utils.py                  # 多文件问答与向量检索
-│   └── main.py
-└── temp.pdf                      # 示例PDF
+└── 项目4智能PDF问答工具/
+    └── utils.py                  # 多文件问答与向量检索
 ```
 
 ---
@@ -113,9 +120,29 @@ LangChain/
 - **AI框架**：LangChain
 - **大模型**：OpenAI GPT-3.5/4、DeepSeek Chat
 - **向量数据库**：FAISS
-- **嵌入模型**：HuggingFace Embeddings
+- **嵌入模型**：HuggingFace Embeddings (paraphrase-multilingual-Mpnet-base-v2)
 - **文档处理**：PyPDF, python-docx, reportlab
 - **数据验证**：Pydantic
+
+---
+
+## 🆕 最新更新 (v2.0)
+
+### PDF智能问答工具重大升级
+
+- **全新界面设计**：采用三栏布局，操作更直观
+- **改进的对话管理**：
+  - 🗨️ 一键新建对话，快速重置会话状态
+  - 📚 历史对话列表，支持对话切换和恢复
+  - 💡 智能问题建议，一键快速提问
+- **优化的用户体验**：
+  - 固定底部输入栏，输入更便捷
+  - 实时状态提示，处理过程透明化
+  - 更友好的错误处理和状态反馈
+- **增强的功能**：
+  - 支持多文档同时上传和问答
+  - 改进的答案来源溯源显示
+  - 更稳定的向量检索和嵌入处理
 
 ---
 
@@ -123,8 +150,11 @@ LangChain/
 
 1. **首次使用**：在侧栏输入 OpenAI API 密钥（小红书需单独输入 DeepSeek Key）
 2. **选择功能**：点击侧栏按钮切换不同工具
-3. **输入内容**：根据界面提示输入相关信息
-4. **获取结果**：等待AI处理并查看生成结果
+3. **PDF问答使用**：
+   - 上传文档 → 输入问题 → 获取智能答案
+   - 使用建议问题快速提问
+   - 通过历史对话管理多个会话
+4. **其他功能**：根据界面提示输入相关信息
 5. **历史记录/收藏**：支持查看、恢复、导出、收藏
 
 ---
@@ -136,12 +166,20 @@ LangChain/
 - 网络需能访问 OpenAI/DeepSeek API（如需代理请配置 base_url）
 - 推荐使用虚拟环境
 - 若遇到 `langchain_huggingface` 报错，请安装 `langchain-huggingface` 包
+- 首次使用PDF问答功能会自动下载嵌入模型，请耐心等待
+
+---
+
+## 🌐 在线演示
+
+项目已部署到 GitHub Pages，您可以直接访问：
+[https://heshen-1.github.io/LangChain/](https://heshen-1.github.io/LangChain/)
 
 ---
 
 ## 📞 技术支持
 
-如遇到问题或需要技术支持，请联系开发团队或在 [GitHub Issues](https://github.com/HeShen-1/LangChain) 留言。
+如遇到问题或需要技术支持，请联系开发团队或在 [GitHub Issues](https://github.com/HeShen-1/LangChain/issues) 留言。
 
 ---
 
