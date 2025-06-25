@@ -964,7 +964,7 @@ def show_xiaohongshu():
             for i, url in enumerate(image_urls):
                 with img_cols[i]:
                     try:
-                        st.image(url, use_column_width=True)
+                        st.image(url,use_container_width=True)
                     except:
                         st.image(url, width=200)
                     if st.button("设为最终配图", key=f"final_sel_{i}"):
@@ -972,7 +972,7 @@ def show_xiaohongshu():
             if final_selected_image:
                 st.success("已选择最终配图！")
                 try:
-                    st.image(final_selected_image, use_column_width=True, caption="最终配图")
+                    st.image(final_selected_image,use_container_width=True, caption="最终配图")
                 except:
                     st.image(final_selected_image, width=400, caption="最终配图")
             st.markdown('</div>', unsafe_allow_html=True)
